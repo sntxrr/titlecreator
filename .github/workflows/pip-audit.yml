@@ -22,17 +22,12 @@ jobs:
       - name: Run pip-audit
         run: |
           pip-audit -f json --progress off > audit.json || true
-          python - <<'PY'
-import json,sys
-try:
-    data=json.load(open('audit.json'))
-except Exception:
-    data=[]
-if len(data)>0:
-    print('Vulnerabilities found:')
-    for v in data:
-        print(v)
-    sys.exit(1)
-else:
-    print('No vulnerabilities found')
-PY
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq || true
+          if [ -s audit.json ] && [ "$(jq 'length' audit.json)" -gt 0 ]; then
+            echo "Vulnerabilities found"
+            jq '.' audit.json
+            exit 1
+          else
+            echo "No vulnerabilities found"
+          fi
