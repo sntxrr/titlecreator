@@ -1,0 +1,38 @@
+name: pip-audit
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+      - name: Install project dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
+      - name: Install pip-audit
+        run: python -m pip install pip-audit
+      - name: Run pip-audit
+        run: |
+          pip-audit -f json --progress off > audit.json || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq || true
+          if [ -s audit.json ]; then
+            vuln_count=$(jq '[.dependencies[] | select(.vulns and (.vulns|length>0))] | length' audit.json)
+            if [ "$vuln_count" -gt 0 ]; then
+              echo "Vulnerabilities found (count=$vuln_count)"
+              jq '.' audit.json
+              exit 1
+            else
+              echo "No vulnerabilities found"
+            fi
+          else
+            echo "No audit output"
+          fi
